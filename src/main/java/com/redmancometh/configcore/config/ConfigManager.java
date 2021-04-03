@@ -10,6 +10,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
@@ -60,6 +62,7 @@ public class ConfigManager<T> {
 				.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_DASHES)
 				.registerTypeHierarchyAdapter(String.class, new PathAdapter())
 				.registerTypeHierarchyAdapter(Material.class, new MaterialAdapter())
+				.registerTypeHierarchyAdapter(PotionEffect.class, new PotionEffectAdapter())
 				.registerTypeAdapter(Location.class, new LocationAdapter())
 				.registerTypeHierarchyAdapter(Class.class, new ClassAdapter()).setPrettyPrinting().create();
 	}
@@ -143,18 +146,46 @@ public class ConfigManager<T> {
 
 		@Override
 		public Class<?> read(JsonReader jsonReader) throws IOException {
-			System.out.println("READ CLASS ADAPTER");
 			String className = jsonReader.nextString();
-			System.out.println("Searching for class name: " + className);
 			try {
-				Class clazz = Class.forName(className);
-				System.out.println("Found class: " + clazz);
-				return clazz;
+				return Class.forName(className);
 			} catch (ClassNotFoundException e) {
 				e.printStackTrace();
 			}
 			return null;
 		}
+	}
+
+	public static class PotionEffectAdapter extends TypeAdapter<PotionEffect> {
+
+		@Override
+		public PotionEffect read(JsonReader reader) throws IOException {
+			reader.beginObject();
+			JsonToken token = reader.peek();
+			PotionEffectType type = null;
+			int duration = 0;
+			int amplifier = 0;
+			while (reader.hasNext()) {
+				if (token.equals(JsonToken.NAME)) {
+					String fieldName = reader.nextName();
+					if (fieldName.equalsIgnoreCase("effect")) {
+						type = PotionEffectType.getByName(reader.nextString().toUpperCase());
+					} else if (fieldName.equalsIgnoreCase("duration")) {
+						duration = reader.nextInt();
+					} else if (fieldName.equalsIgnoreCase("amplifier")) {
+						amplifier = reader.nextInt();
+					}
+				}
+			}
+			reader.endObject();
+			return new PotionEffect(type, duration, amplifier);
+		}
+
+		@Override
+		public void write(JsonWriter arg0, PotionEffect arg1) throws IOException {
+
+		}
+
 	}
 
 	public static class LocationAdapter extends TypeAdapter<Location> {
