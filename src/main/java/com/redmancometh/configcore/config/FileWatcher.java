@@ -20,7 +20,7 @@ public class FileWatcher {
 	private Consumer<File> onChangedCallback;
 	private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 	private String lastHash;
-	private ScheduledFuture future;
+	private ScheduledFuture<?> future;
 
 	/**
 	 * Create a file watcher to watch for changes on the given file, and execute the

@@ -50,15 +50,15 @@ public class ConfigManager<T> {
 	@Setter
 	private Runnable onReload;
 
-	public ConfigManager(String fileName, Class clazz) {
+	public ConfigManager(String fileName, Class<T> clazz) {
 		this(fileName, clazz, null);
 	}
 
-	public ConfigManager(String fileName, Class clazz, Runnable onReload) {
+	public ConfigManager(String fileName, Class<T> clazz, Runnable onReload) {
 		this(fileName, clazz, onReload, null);
 	}
 
-	public ConfigManager(String fileName, Class clazz, Runnable onReload, GsonBuilder gsonBuilder) {
+	public ConfigManager(String fileName, Class<T> clazz, Runnable onReload, GsonBuilder gsonBuilder) {
 		super();
 		this.fileName = fileName;
 		this.clazz = clazz;
@@ -176,9 +176,9 @@ public class ConfigManager<T> {
 		}
 	}
 
-	public static class ClassAdapter extends TypeAdapter<Class> {
+	public static class ClassAdapter extends TypeAdapter<Class<?>> {
 		@Override
-		public void write(JsonWriter jsonWriter, Class material) throws IOException {
+		public void write(JsonWriter jsonWriter, Class<?> material) throws IOException {
 
 		}
 

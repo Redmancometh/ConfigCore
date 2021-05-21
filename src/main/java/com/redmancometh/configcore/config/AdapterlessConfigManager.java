@@ -27,10 +27,10 @@ public class AdapterlessConfigManager<T> {
 	private Gson gson = new GsonBuilder().excludeFieldsWithModifiers(Modifier.PROTECTED)
 			.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_DASHES).setPrettyPrinting().create();
 	private String fileName;
-	private Class clazz;
+	private Class<T> clazz;
 	private T config;
 
-	public AdapterlessConfigManager(String fileName, Class clazz) {
+	public AdapterlessConfigManager(String fileName, Class<T> clazz) {
 		super();
 		this.fileName = fileName;
 		this.clazz = clazz;
@@ -62,7 +62,7 @@ public class AdapterlessConfigManager<T> {
 		}
 		try (FileReader reader = new FileReader("config" + File.separator + fileName)) {
 			System.out.println("CLASS: " + clazz);
-			T conf = (T) getGson().fromJson(reader, clazz);
+			T conf = getGson().fromJson(reader, clazz);
 			this.config = conf;
 		} catch (IOException e1) {
 			e1.printStackTrace();

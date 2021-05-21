@@ -23,8 +23,8 @@ public class DirectoryWatcher {
 	private String monitored;
 	private Consumer<File> onChangedCallback;
 	private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-	private Map<String, String> hashMap = new ConcurrentHashMap();
-	private ScheduledFuture future;
+	private Map<String, String> hashMap = new ConcurrentHashMap<>();
+	private ScheduledFuture<?> future;
 	private String[] extensions;
 
 	/**
