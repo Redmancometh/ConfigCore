@@ -1,17 +1,15 @@
 package com.redmancometh.configcore.config;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Modifier;
-
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
+import java.nio.file.Path;
+import java.util.Optional;
 
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
@@ -21,8 +19,17 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
+import org.apache.commons.io.IOUtils;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+
 import lombok.Data;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 
 /**
@@ -36,7 +43,7 @@ public class ConfigManager<T> {
 	@Getter
 	protected Gson gson;
 	protected String fileName;
-	protected Class clazz;
+	protected Class<T> clazz;
 	protected T config;
 	private FileWatcher watcher;
 	@Getter
@@ -106,14 +113,45 @@ public class ConfigManager<T> {
 	}
 
 	protected void initConfig() {
-		File confFile = new File("config" + File.separator + fileName);
-		try (FileReader reader = new FileReader(confFile)) {
-			T conf = (T) getGson().fromJson(reader, clazz);
+		File configDir = new File("config");
+		if(!configDir.exists()) {
+			configDir.mkdir();
+		}
+
+		Path configPath = Path.of("config", fileName);
+
+		if(configPath.toFile().exists()) {
+			getConfigFromFileSystem(configPath);
+			return;
+		}
+
+		getConfigFromClassPath(configPath);
+	}
+
+	private Optional<InputStream> getDefaultConfigInputStream(@NonNull Path configPath) {
+		return Optional.ofNullable(getClass().getResourceAsStream(configPath.toAbsolutePath().toString()));
+	}
+
+	private void getConfigFromFileSystem(@NonNull Path path) {
+		try (FileReader reader = new FileReader(path.toFile())) {
+			T conf = getGson().fromJson(reader, clazz);
 			this.config = conf;
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
+	}
 
+	private void getConfigFromClassPath(@NonNull Path path) {
+		Optional<InputStream> defaultConfigStreamOpt = getDefaultConfigInputStream(path);
+		defaultConfigStreamOpt.ifPresent(inStream -> {
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(inStream))) {
+				T conf = getGson().fromJson(reader, clazz);
+				this.config = conf;
+				IOUtils.copy(reader, new FileWriter(path.toFile()));
+			} catch(IOException e) {
+				e.printStackTrace();
+			}
+		});
 	}
 
 	public T targetUnit() {
