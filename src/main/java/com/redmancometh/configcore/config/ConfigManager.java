@@ -1,13 +1,25 @@
 package com.redmancometh.configcore.config;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.Type;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.nio.file.Path;
+import java.util.Optional;
 
+import com.google.gson.FieldNamingPolicy;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapter;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
+import com.google.gson.stream.JsonWriter;
+
+import org.apache.commons.io.IOUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -15,23 +27,9 @@ import org.bukkit.Material;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-import com.google.gson.FieldNamingPolicy;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-import com.google.gson.TypeAdapter;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
-import com.google.gson.stream.JsonWriter;
-
 import lombok.Data;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 
 /**
@@ -45,22 +43,22 @@ public class ConfigManager<T> {
 	@Getter
 	protected Gson gson;
 	protected String fileName;
-	protected Class clazz;
+	protected Class<T> clazz;
 	protected T config;
 	private FileWatcher watcher;
 	@Getter
 	@Setter
 	private Runnable onReload;
 
-	public ConfigManager(String fileName, Class clazz) {
+	public ConfigManager(String fileName, Class<T> clazz) {
 		this(fileName, clazz, null);
 	}
 
-	public ConfigManager(String fileName, Class clazz, Runnable onReload) {
+	public ConfigManager(String fileName, Class<T> clazz, Runnable onReload) {
 		this(fileName, clazz, onReload, null);
 	}
 
-	public ConfigManager(String fileName, Class clazz, Runnable onReload, GsonBuilder gsonBuilder) {
+	public ConfigManager(String fileName, Class<T> clazz, Runnable onReload, GsonBuilder gsonBuilder) {
 		super();
 		this.fileName = fileName;
 		this.clazz = clazz;
@@ -73,7 +71,6 @@ public class ConfigManager<T> {
 				.registerTypeHierarchyAdapter(Material.class, new MaterialAdapter())
 				.registerTypeHierarchyAdapter(PotionEffect.class, new PotionEffectAdapter())
 				.registerTypeAdapter(Location.class, new LocationAdapter())
-				.registerTypeAdapter(AtomicInteger.class, new AtomicIntegerTypeAdapter())
 				.registerTypeHierarchyAdapter(Class.class, new ClassAdapter()).setPrettyPrinting().create();
 	}
 
@@ -116,14 +113,45 @@ public class ConfigManager<T> {
 	}
 
 	protected void initConfig() {
-		File confFile = new File("config" + File.separator + fileName);
-		try (FileReader reader = new FileReader(confFile)) {
-			T conf = (T) getGson().fromJson(reader, clazz);
+		File configDir = new File("config");
+		if(!configDir.exists()) {
+			configDir.mkdir();
+		}
+
+		Path configPath = Path.of("config", fileName);
+
+		if(configPath.toFile().exists()) {
+			getConfigFromFileSystem(configPath);
+			return;
+		}
+
+		getConfigFromClassPath(configPath);
+	}
+
+	private Optional<InputStream> getDefaultConfigInputStream(@NonNull Path configPath) {
+		return Optional.ofNullable(getClass().getResourceAsStream(configPath.toAbsolutePath().toString()));
+	}
+
+	private void getConfigFromFileSystem(@NonNull Path path) {
+		try (FileReader reader = new FileReader(path.toFile())) {
+			T conf = getGson().fromJson(reader, clazz);
 			this.config = conf;
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
+	}
 
+	private void getConfigFromClassPath(@NonNull Path path) {
+		Optional<InputStream> defaultConfigStreamOpt = getDefaultConfigInputStream(path);
+		defaultConfigStreamOpt.ifPresent(inStream -> {
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(inStream))) {
+				T conf = getGson().fromJson(reader, clazz);
+				this.config = conf;
+				IOUtils.copy(reader, new FileWriter(path.toFile()));
+			} catch(IOException e) {
+				e.printStackTrace();
+			}
+		});
 	}
 
 	public T targetUnit() {
@@ -132,21 +160,6 @@ public class ConfigManager<T> {
 
 	public void setConfig(T config) {
 		this.config = config;
-	}
-
-	private static class AtomicIntegerTypeAdapter
-			implements JsonSerializer<AtomicInteger>, JsonDeserializer<AtomicInteger> {
-		@Override
-		public JsonElement serialize(AtomicInteger src, Type typeOfSrc, JsonSerializationContext context) {
-			return new JsonPrimitive(src.incrementAndGet());
-		}
-
-		@Override
-		public AtomicInteger deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
-				throws JsonParseException {
-			int intValue = json.getAsInt();
-			return new AtomicInteger(--intValue);
-		}
 	}
 
 	public static class MaterialAdapter extends TypeAdapter<Material> {
@@ -163,9 +176,9 @@ public class ConfigManager<T> {
 		}
 	}
 
-	public static class ClassAdapter extends TypeAdapter<Class> {
+	public static class ClassAdapter extends TypeAdapter<Class<?>> {
 		@Override
-		public void write(JsonWriter jsonWriter, Class material) throws IOException {
+		public void write(JsonWriter jsonWriter, Class<?> material) throws IOException {
 
 		}
 
