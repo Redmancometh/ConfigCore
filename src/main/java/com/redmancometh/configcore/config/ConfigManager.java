@@ -25,7 +25,7 @@ import com.google.gson.TypeAdapter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
-
+import net.minecraft.server.v1_16_R3.Enchantment.Rarity;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -70,6 +70,8 @@ public class ConfigManager<T> {
 				.registerTypeHierarchyAdapter(Material.class, new MaterialAdapter())
 				.registerTypeHierarchyAdapter(Effect.class, new EffectAdapter())
 				.registerTypeHierarchyAdapter(EntityType.class, new EntityTypeAdapter())
+				.registerTypeHierarchyAdapter(Rarity.class, new RarityAdapter())
+
 				.registerTypeHierarchyAdapter(PotionEffect.class, new PotionEffectAdapter())
 				.registerTypeAdapter(Location.class, new LocationAdapter())
 				.registerTypeAdapter(BlockFace.class, new BlockFaceAdapter())
@@ -133,6 +135,20 @@ public class ConfigManager<T> {
 
 	public void setConfig(T config) {
 		this.config = config;
+	}
+
+	public static class RarityAdapter extends TypeAdapter<Rarity> {
+
+		@Override
+		public Rarity read(JsonReader arg0) throws IOException {
+			String materialValue = arg0.nextString();
+			return Rarity.valueOf(materialValue.replace(" ", "_").toUpperCase());
+		}
+
+		@Override
+		public void write(JsonWriter arg0, Rarity arg1) throws IOException {
+			arg0.value(arg1.toString());
+		}
 	}
 
 	public static class BlockFaceAdapter extends TypeAdapter<BlockFace> {
