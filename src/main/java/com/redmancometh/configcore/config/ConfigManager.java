@@ -1,15 +1,22 @@
 package com.redmancometh.configcore.config;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.lang.reflect.Modifier;
-import java.nio.file.Path;
-import java.util.Optional;
+
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Effect;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.block.BlockFace;
+import org.bukkit.entity.EntityType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
@@ -19,17 +26,8 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
-import org.apache.commons.io.IOUtils;
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
-
 import lombok.Data;
 import lombok.Getter;
-import lombok.NonNull;
 import lombok.Setter;
 
 /**
@@ -43,22 +41,23 @@ public class ConfigManager<T> {
 	@Getter
 	protected Gson gson;
 	protected String fileName;
-	protected Class<T> clazz;
+	protected Class clazz;
 	protected T config;
 	private FileWatcher watcher;
 	@Getter
 	@Setter
 	private Runnable onReload;
 
-	public ConfigManager(String fileName, Class<T> clazz) {
+	public ConfigManager(String fileName, Class clazz) {
 		this(fileName, clazz, null);
 	}
 
-	public ConfigManager(String fileName, Class<T> clazz, Runnable onReload) {
+	public ConfigManager(String fileName, Class clazz, Runnable onReload) {
 		this(fileName, clazz, onReload, null);
+
 	}
 
-	public ConfigManager(String fileName, Class<T> clazz, Runnable onReload, GsonBuilder gsonBuilder) {
+	public ConfigManager(String fileName, Class clazz, Runnable onReload, GsonBuilder gsonBuilder) {
 		super();
 		this.fileName = fileName;
 		this.clazz = clazz;
@@ -69,8 +68,11 @@ public class ConfigManager<T> {
 				.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_DASHES)
 				.registerTypeHierarchyAdapter(String.class, new PathAdapter())
 				.registerTypeHierarchyAdapter(Material.class, new MaterialAdapter())
+				.registerTypeHierarchyAdapter(Effect.class, new EffectAdapter())
+				.registerTypeHierarchyAdapter(EntityType.class, new EntityTypeAdapter())
 				.registerTypeHierarchyAdapter(PotionEffect.class, new PotionEffectAdapter())
 				.registerTypeAdapter(Location.class, new LocationAdapter())
+				.registerTypeAdapter(BlockFace.class, new BlockFaceAdapter())
 				.registerTypeHierarchyAdapter(Class.class, new ClassAdapter()).setPrettyPrinting().create();
 	}
 
@@ -113,45 +115,16 @@ public class ConfigManager<T> {
 	}
 
 	protected void initConfig() {
-		File configDir = new File("config");
-		if(!configDir.exists()) {
-			configDir.mkdir();
-		}
-
-		Path configPath = Path.of("config", fileName);
-
-		if(configPath.toFile().exists()) {
-			getConfigFromFileSystem(configPath);
-			return;
-		}
-
-		getConfigFromClassPath(configPath);
-	}
-
-	private Optional<InputStream> getDefaultConfigInputStream(@NonNull Path configPath) {
-		return Optional.ofNullable(getClass().getResourceAsStream(configPath.toAbsolutePath().toString()));
-	}
-
-	private void getConfigFromFileSystem(@NonNull Path path) {
-		try (FileReader reader = new FileReader(path.toFile())) {
-			T conf = getGson().fromJson(reader, clazz);
-			this.config = conf;
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-	}
-
-	private void getConfigFromClassPath(@NonNull Path path) {
-		Optional<InputStream> defaultConfigStreamOpt = getDefaultConfigInputStream(path);
-		defaultConfigStreamOpt.ifPresent(inStream -> {
-			try (BufferedReader reader = new BufferedReader(new InputStreamReader(inStream))) {
-				T conf = getGson().fromJson(reader, clazz);
+		File confFile = new File("config" + File.separator + fileName);
+		try (FileInputStream inputStream = new FileInputStream(confFile)) {
+			try (Reader in = new InputStreamReader(inputStream, "UTF-8")) {
+				T conf = (T) getGson().fromJson(in, clazz);
 				this.config = conf;
-				IOUtils.copy(reader, new FileWriter(path.toFile()));
-			} catch(IOException e) {
-				e.printStackTrace();
 			}
-		});
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
 	}
 
 	public T targetUnit() {
@@ -160,6 +133,48 @@ public class ConfigManager<T> {
 
 	public void setConfig(T config) {
 		this.config = config;
+	}
+
+	public static class BlockFaceAdapter extends TypeAdapter<BlockFace> {
+
+		@Override
+		public BlockFace read(JsonReader arg0) throws IOException {
+			String materialValue = arg0.nextString();
+			return BlockFace.valueOf(materialValue.replace(" ", "_").toUpperCase());
+		}
+
+		@Override
+		public void write(JsonWriter arg0, BlockFace arg1) throws IOException {
+			arg0.value(arg1.toString());
+		}
+	}
+
+	public static class EffectAdapter extends TypeAdapter<Effect> {
+
+		@Override
+		public Effect read(JsonReader arg0) throws IOException {
+			String materialValue = arg0.nextString();
+			return Effect.valueOf(materialValue.replace(" ", "_").toUpperCase());
+		}
+
+		@Override
+		public void write(JsonWriter arg0, Effect arg1) throws IOException {
+			arg0.value(arg1.toString());
+		}
+	}
+
+	public static class EntityTypeAdapter extends TypeAdapter<EntityType> {
+
+		@Override
+		public EntityType read(JsonReader arg0) throws IOException {
+			String materialValue = arg0.nextString();
+			return EntityType.valueOf(materialValue.replace(" ", "_").toUpperCase());
+		}
+
+		@Override
+		public void write(JsonWriter arg0, EntityType arg1) throws IOException {
+			arg0.value(arg1.toString());
+		}
 	}
 
 	public static class MaterialAdapter extends TypeAdapter<Material> {
@@ -176,9 +191,9 @@ public class ConfigManager<T> {
 		}
 	}
 
-	public static class ClassAdapter extends TypeAdapter<Class<?>> {
+	public static class ClassAdapter extends TypeAdapter<Class> {
 		@Override
-		public void write(JsonWriter jsonWriter, Class<?> material) throws IOException {
+		public void write(JsonWriter jsonWriter, Class material) throws IOException {
 
 		}
 
@@ -280,7 +295,7 @@ public class ConfigManager<T> {
 		@Override
 		public String read(JsonReader arg0) throws IOException {
 			String string = arg0.nextString();
-			if (string.contains("http"))
+			if (string.contains("http") || string.contains("jdbc"))
 				return string;
 			return ChatColor.translateAlternateColorCodes('&',
 					string.replace("//", File.separator).replace("\\", File.separator));
